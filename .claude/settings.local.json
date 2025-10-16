@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(copy .env.example .env)",
+      "Bash(npm run sync:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

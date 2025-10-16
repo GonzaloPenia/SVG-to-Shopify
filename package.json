@@ -1,0 +1,27 @@
+{
+  "name": "google-sheets-to-shopify",
+  "version": "1.0.0",
+  "description": "Sincroniza precios desde Google Sheets a Shopify",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "sync": "ts-node src/index.ts"
+  },
+  "keywords": ["shopify", "google-sheets", "sync", "prices"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@shopify/shopify-api": "^9.0.0",
+    "csv-parse": "^5.5.0",
+    "csv-stringify": "^6.4.0",
+    "dotenv": "^16.4.0",
+    "googleapis": "^130.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
