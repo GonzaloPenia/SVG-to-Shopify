@@ -19,11 +19,7 @@ npm install
 
 1. Ve a [COMO_USAR_API_KEY.md](COMO_USAR_API_KEY.md) para pasos detallados
 2. Haz tu Google Sheet público (Anyone with link - Viewer)
-3. Crea y edita tu `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-4. Agrega tu API Key al `.env`:
+3. Edita tu archivo `.env` y agrega tu API Key:
    ```env
    GOOGLE_SHEET_ID=1XghMdKq5defsbHlISVkDry0TEoR9Wsr1KFxmjO_ZeAI
    GOOGLE_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -37,11 +33,7 @@ npm install
 2. Crea una Service Account en Google Cloud
 3. Descarga `credentials.json` y guárdalo en la raíz del proyecto
 4. Comparte tu Sheet con el email de la Service Account
-5. Crea y edita tu `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-6. Configura la ruta a credentials:
+5. Edita tu archivo `.env` y configura la ruta a credentials:
    ```env
    GOOGLE_SHEET_ID=1XghMdKq5defsbHlISVkDry0TEoR9Wsr1KFxmjO_ZeAI
    GOOGLE_CREDENTIALS_PATH=./credentials.json
@@ -224,11 +216,7 @@ npm install
 **3. Configura Shopify:**
 - Crea una Custom App en tu tienda Shopify
 - Copia el Access Token
-- Crea el archivo `.env`:
-  ```bash
-  cp .env.example .env
-  ```
-- Edita `.env` y pega tu token
+- Edita el archivo `.env` y pega tu token
 
 **4. Prueba la sincronización:**
 ```bash

@@ -2,8 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(dir:*)",
-      "Bash(copy .env.example .env)",
-      "Bash(npm run sync:*)"
+      "Bash(npm run sync:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run test:10:*)",
+      "Bash(npm run test:optimized:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []

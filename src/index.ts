@@ -137,8 +137,8 @@ Ejemplos:
   npm run sync sample    # Genera archivo de ejemplo
 
 Configuración:
-  1. Copia .env.example a .env
-  2. Configura tus credenciales de Google Sheets y Shopify
+  1. Configura tus credenciales en el archivo .env
+  2. Asegúrate de tener Google Sheets API y Shopify Access Token configurados
   3. Ejecuta el comando según el modo deseado
       `);
       await app.sync('csv');

@@ -126,14 +126,9 @@ Esto instalará todas las librerías necesarias.
 
 ### 3.3 Configurar variables de entorno
 
-1. Copia el archivo de ejemplo:
-```bash
-cp .env.example .env
-```
+1. Abre el archivo `.env` en tu editor de texto favorito
 
-2. Abre `.env` en tu editor de texto favorito
-
-3. Completa cada campo:
+2. Completa cada campo:
 
 ```env
 # Google Sheets

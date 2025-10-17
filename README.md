@@ -1,300 +1,217 @@
-<<<<<<< HEAD
-# SVG-to-Shopify
-App que permite subir un SVG con un listado de productos y agregarlos a una tienda online de Shopify 
-=======
 # Google Sheets to Shopify Sync
 
-Aplicación Node.js con TypeScript para sincronizar precios desde Google Sheets a Shopify.
+Aplicación Node.js con TypeScript para sincronizar productos de neumáticos desde Google Sheets a Shopify con estructura dual (productos padre + individuales).
 
-## Características
+## 🚀 Inicio Rápido
 
-- Lee datos desde Google Sheets (hojas "Panel_Precios" y "Padres")
-- Transforma datos al formato CSV compatible con Shopify
-- Exporta CSV para importación manual
-- Sube productos directamente a Shopify vía Admin API
-- Actualiza solo precios de productos existentes
-- Validación de datos antes de procesar
-- Control de rate limits para API de Shopify
+```bash
+# 1. Instalar dependencias
+npm install
 
-## Requisitos
+# 2. Configurar .env (ya está configurado)
+# Ver .env con tus credenciales
+
+# 3. Probar el sistema optimizado
+npm run test:optimized
+```
+
+## ✨ Características
+
+- ✅ Lectura de datos desde Google Sheets (API Key o Service Account)
+- ✅ **Estructura dual de productos**:
+  - **Productos PADRE**: 1 por modelo con todas las medidas como variantes
+  - **Productos INDIVIDUALES**: 1 por medida como producto separado
+- ✅ Handles únicos y consistentes con SKU
+- ✅ Inventario automático (20 unidades por defecto)
+- ✅ Batch processing con rate limiting
+- ✅ Sincronización modelo por modelo
+- ✅ Precios con IVA incluido
+- ✅ Descripción desde columna E (Descripción)
+
+## 📦 Requisitos
 
 - Node.js 18+
 - npm o yarn
-- Cuenta de Google Cloud con acceso a Google Sheets API
-- Tienda de Shopify con acceso a Admin API
+- Google Sheets API (API Key o Service Account)
+- Tienda de Shopify con Admin API access
 
-## Instalación
-
-1. Clona el repositorio:
-```bash
-git clone <tu-repo>
-cd AppSVGtoShopify
-```
-
-2. Instala las dependencias:
-```bash
-npm install
-```
-
-3. Configura las variables de entorno:
-```bash
-cp .env.example .env
-```
-
-Edita el archivo `.env` con tus credenciales.
-
-## Configuración
-
-### Google Sheets API
-
-**Tienes 2 opciones para autenticarte con Google Sheets:**
-
-#### Opción 1: API Key (Más Simple) ⭐
-
-**Si conseguiste una API Key:**
-- 👉 Lee [COMO_USAR_API_KEY.md](COMO_USAR_API_KEY.md)
-- Requiere que el Google Sheet sea público
-- Configuración en 4 pasos
-- Perfecto para empezar rápidamente
-
-#### Opción 2: Service Account (Más Seguro)
-
-**Si prefieres sheets privados:**
-- 👉 Lee [DONDE_OBTENER_CREDENTIALS.md](DONDE_OBTENER_CREDENTIALS.md)
-- Permite sheets privados
-- Requiere crear `credentials.json`
-- Recomendado para producción
-
-**Resumen del método Service Account:**
-1. Ve a [Google Cloud Console](https://console.cloud.google.com/)
-2. Crea un nuevo proyecto
-3. Habilita la Google Sheets API
-4. Crea una cuenta de servicio (Service Account)
-5. Descarga las credenciales JSON → `credentials.json`
-6. Comparte tu Sheet con el email de la cuenta de servicio
-
-### Shopify Admin API
-
-#### Opción 1: Custom App (Recomendado)
-
-1. En tu Shopify Admin, ve a **Settings > Apps and sales channels**
-2. Clic en **Develop apps**
-3. Crea una nueva app
-4. En **Configuration**, activa:
-   - `read_products`
-   - `write_products`
-5. Instala la app y copia el **Admin API access token**
-
-#### Opción 2: Private App (Método antiguo)
-
-1. Ve a **Apps > Manage private apps**
-2. Crea una nueva private app
-3. Activa los permisos necesarios
-4. Copia el **API Password**
-
-### Variables de entorno
-
-```env
-# Google Sheets
-GOOGLE_SHEET_ID=1XghMdKq5defsbHlISVkDry0TEoR9Wsr1KFxmjO_ZeAI
-GOOGLE_CREDENTIALS_PATH=./credentials.json
-PANEL_PRECIOS_SHEET_NAME=Panel_Precios
-PADRES_SHEET_NAME=Padres
-
-# Shopify
-SHOPIFY_SHOP_DOMAIN=tu-tienda.myshopify.com
-SHOPIFY_ACCESS_TOKEN=tu_access_token
-SHOPIFY_API_VERSION=2024-01
-
-# Output
-OUTPUT_CSV_PATH=./output/shopify_products.csv
-```
-
-## Uso
-
-### Modo 1: Generar CSV (Recomendado para primera vez)
-
-Genera un archivo CSV que puedes importar manualmente en Shopify:
+## 🧪 Scripts Disponibles
 
 ```bash
-npm run sync
-# o específicamente:
-npm run sync csv
+# Test del sistema optimizado (RECOMENDADO)
+npm run test:optimized
+
+# Sincronización completa de todos los modelos
+npm run sync:all
+
+# Test con un solo modelo (sistema anterior)
+npm run test:one
+
+# Desarrollo
+npm run dev
+
+# Build
+npm run build
 ```
 
-El archivo se generará en `./output/shopify_products.csv`
+## 📚 Documentación
 
-**Para importar en Shopify:**
-1. Ve a **Products > Import**
-2. Sube el archivo CSV generado
-3. Mapea las columnas si es necesario
-4. Confirma la importación
+Toda la documentación está en la carpeta **[Documentacion/](Documentacion/)**:
 
-### Modo 2: Subir directamente a Shopify
+### Guías de Inicio
+- **[INICIO_RAPIDO.md](Documentacion/INICIO_RAPIDO.md)**: Guía para empezar en minutos
+- **[SETUP.md](Documentacion/SETUP.md)**: Configuración detallada paso a paso
+- **[VERIFICAR_ANTES_DE_EJECUTAR.md](Documentacion/VERIFICAR_ANTES_DE_EJECUTAR.md)**: Checklist pre-ejecución
 
-Sube productos automáticamente vía API:
+### Configuración
+- **[COMO_USAR_API_KEY.md](Documentacion/COMO_USAR_API_KEY.md)**: Autenticación con API Key (más simple)
+- **[DONDE_OBTENER_CREDENTIALS.md](Documentacion/DONDE_OBTENER_CREDENTIALS.md)**: Service Account (más seguro)
 
-```bash
-npm run sync upload
+### Estructura de Datos
+- **[ESTRUCTURA_DATOS.md](Documentacion/ESTRUCTURA_DATOS.md)**: Columnas del Google Sheet y mapeo a Shopify
+
+### Sistema Optimizado
+- **[SISTEMA_OPTIMIZADO.md](Documentacion/SISTEMA_OPTIMIZADO.md)**: ⭐ Guía del sistema optimizado
+- **[OPTIMIZACIONES.md](Documentacion/OPTIMIZACIONES.md)**: Detalles técnicos de las optimizaciones
+
+## 🎯 Flujo de Sincronización
+
+```
+Google Sheet (Panel_Precios)
+        ↓
+Agrupación por Modelo
+        ↓
+┌──────────────────────┐
+│  Por cada Modelo:    │
+│                      │
+│  1. Crear PADRE      │
+│     (con variantes)  │
+│                      │
+│  2. Delay (2s)       │
+│                      │
+│  3. Crear INDIV.     │
+│     (en batches)     │
+└──────────────────────┘
+        ↓
+    Shopify
 ```
 
-Este modo:
-- Crea productos nuevos
-- Actualiza productos existentes (busca por Handle)
-- Respeta rate limits de Shopify
-- Procesa en batches de 10 productos
-
-### Modo 3: Actualizar solo precios
-
-Actualiza únicamente los precios de productos existentes:
-
-```bash
-npm run sync prices-only
-```
-
-Útil para sincronizaciones frecuentes de precios sin modificar otros datos.
-
-### Generar CSV de muestra
-
-Para ver la estructura esperada:
-
-```bash
-npm run sync sample
-```
-
-## Estructura del Proyecto
+## 📊 Estructura del Proyecto
 
 ```
 AppSVGtoShopify/
 ├── src/
 │   ├── config/
-│   │   └── index.ts           # Configuración y variables de entorno
+│   │   └── index.ts                   # Configuración
 │   ├── services/
-│   │   ├── googleSheets.ts    # Lectura de Google Sheets
-│   │   ├── dataTransformer.ts # Transformación de datos
-│   │   ├── csvExporter.ts     # Exportación a CSV
-│   │   └── shopifyUploader.ts # Subida a Shopify API
+│   │   ├── googleSheets.ts            # Lectura de Google Sheets
+│   │   ├── optimizedTransformer.ts    # ⭐ Transformer optimizado
+│   │   ├── optimizedUploader.ts       # ⭐ Uploader con batches
+│   │   └── optimizedSync.ts           # ⭐ Orquestador
+│   ├── utils/
+│   │   └── handleGenerator.ts         # ⭐ Generación de handles
 │   ├── types/
-│   │   └── index.ts           # Tipos TypeScript
-│   └── index.ts               # Punto de entrada principal
-├── output/                     # Archivos CSV generados
-├── .env                        # Variables de entorno (no versionar)
-├── .env.example                # Ejemplo de configuración
-├── credentials.json            # Credenciales de Google (no versionar)
-├── package.json
-├── tsconfig.json
-└── README.md
+│   │   └── index.ts                   # Tipos TypeScript
+│   ├── testOptimized.ts               # ⭐ Test del sistema optimizado
+│   └── syncAll.ts                     # ⭐ Sincronización completa
+├── Documentacion/                      # 📚 Toda la documentación
+├── .env                                # Credenciales (no versionar)
+└── README.md                           # Este archivo
 ```
 
-## Mapeo de Datos
+## 🔧 Configuración Rápida
 
-### Estructura del Google Sheet
+El archivo `.env` ya está configurado con tus credenciales:
 
-Esta aplicación trabaja con un Google Sheet de catálogo de neumáticos que contiene:
-
-1. **Panel_Precios**: Fuente de precios e inventario actualizado
-   - Columnas principales: SKU/CAI, Marca, Modelo, Medida, Precio con IVA, Precio sin IVA, Stock, Estado, Handle
-   - Se actualiza frecuentemente con datos del sistema de gestión
-
-2. **Padres**: Plantilla completa en formato Shopify (47 columnas)
-   - Contiene toda la estructura de productos lista para Shopify
-   - Incluye: descripciones, imágenes, SEO, metafields, etc.
-   - Se actualiza manualmente cuando hay cambios en información de productos
-
-### Lógica de Sincronización
-
-La aplicación hace un **merge inteligente**:
-
-```
-Panel_Precios (precios) + Padres (plantilla) = CSV Shopify
+```env
+GOOGLE_SHEET_ID=tu_google_sheet_id_aqui
+GOOGLE_API_KEY=tu_google_api_key_aqui
+SHOPIFY_SHOP_DOMAIN=tu-tienda.myshopify.com
+SHOPIFY_ACCESS_TOKEN=shpat_tu_access_token_aqui
 ```
 
-**Proceso:**
-1. Lee la hoja **Padres** (estructura completa del producto)
-2. Busca precios actualizados en **Panel_Precios** usando el **Handle** como clave
-3. Si encuentra el producto en Panel_Precios:
-   - Actualiza: `Variant Price` → **Precio con IVA** (precio de venta final)
-   - Mantiene: `Variant Compare At Price` desde Padres (precio tachado/antes)
-   - Actualiza: `Status` → Estado del producto
-4. Mantiene todo lo demás desde Padres (título, descripción, imágenes, etc.)
+## 🎓 Sistema Dual de Productos
 
-**Nota:** Shopify siempre trabaja con precios con IVA incluido.
+Cada producto del Sheet se sube **dos veces**:
 
-**Campo clave:** El `Handle` debe ser idéntico en ambas hojas para vincular los datos.
+### 1. Producto PADRE
+- **Title**: `Marca + Modelo` (ej: "Michelin PILOT SPORT 4 S")
+- **Handle**: `marca-modelo-p` (sufijo `-p`)
+- **Variantes**: TODAS las medidas del modelo
+- **Stock**: 20 unidades por variante
 
-Ver [ESTRUCTURA_DATOS.md](ESTRUCTURA_DATOS.md) para detalles completos de las columnas y el flujo de datos.
+### 2. Productos INDIVIDUALES
+- **Title**: `Marca + Modelo + Medida` (ej: "Michelin PILOT SPORT 4 S 225/40 R18")
+- **Handle**: `marca-modelo-medida-sku-i` (sufijo `-i`, incluye SKU)
+- **Variantes**: 1 sola (la medida específica)
+- **Stock**: 20 unidades
 
-## Formato CSV de Shopify
+## 🚀 Primer Uso
 
-El archivo CSV generado incluye todas las columnas requeridas por Shopify:
+1. **Ejecuta el test optimizado**:
+   ```bash
+   npm run test:optimized
+   ```
 
-- Handle (identificador único)
-- Title, Description, Vendor, Type, Tags
-- Variantes (SKU, Price, Compare At Price)
-- Inventario y envío
-- Imágenes
-- SEO y Google Shopping
-- Y más...
+2. **Verifica en Shopify**:
+   - Ve a: https://tu-tienda.myshopify.com/admin/products
+   - Busca el modelo que se subió
+   - Verifica que el padre tenga las variantes
+   - Verifica que los individuales se hayan creado
 
-Ver [documentación oficial de Shopify](https://help.shopify.com/en/manual/products/import-export/using-csv) para más detalles.
+3. **Si todo funciona, sincroniza todo**:
+   ```bash
+   npm run sync:all
+   ```
 
-## Solución de Problemas
+## 💡 Ventajas del Sistema Optimizado
 
-### Error: "Archivo de credenciales no encontrado"
+| Aspecto | Antes ❌ | Ahora ✅ |
+|---------|---------|---------|
+| **Handles** | Inconsistentes | Centralizados con SKU |
+| **Descripción** | Falla con espacios | Normalización Unicode |
+| **Individuales** | 0 encontrados | Todos correctos |
+| **Rate Limits** | Sin protección | Batches + Delays |
+| **Inventario** | Manual | Automático (20 unidades) |
+| **Orden** | Caótico | Modelo completo por vez |
+| **Trazabilidad** | Difícil | Modelo por modelo |
 
-Asegúrate de que `credentials.json` está en la raíz del proyecto y la ruta en `.env` es correcta.
+## 🐛 Solución de Problemas
 
-### Error: "No autenticado con Google Sheets"
+### Error: "Cannot initialize Shopify API"
+- Verifica `SHOPIFY_ACCESS_TOKEN` en `.env`
+- Confirma que `SHOPIFY_SHOP_DOMAIN` tiene el formato correcto
 
-Verifica que compartiste el Google Sheet con el email de la cuenta de servicio.
+### Error: Google Sheets API
+- Verifica que el Sheet es público (si usas API Key)
+- Verifica `GOOGLE_API_KEY` en `.env`
 
-### Error: "Shopify API authentication failed"
+### Rate Limits
+- Los delays están configurados para ser seguros
+- Si recibes 429 errors, el sistema tiene retry automático
 
-- Verifica que el `SHOPIFY_ACCESS_TOKEN` es correcto
-- Confirma que tu app tiene los permisos `read_products` y `write_products`
-- Asegúrate de que `SHOPIFY_SHOP_DOMAIN` tiene el formato correcto: `tienda.myshopify.com`
+## 📖 Más Información
 
-### Productos no se importan en Shopify
+- **[SISTEMA_OPTIMIZADO.md](Documentacion/SISTEMA_OPTIMIZADO.md)**: Guía completa del sistema optimizado
+- **[OPTIMIZACIONES.md](Documentacion/OPTIMIZACIONES.md)**: Documentación técnica detallada
 
-- Revisa que los campos requeridos (Handle, Title, Price) estén presentes
-- Verifica el formato del CSV con la opción `sample`
-- Consulta los logs para ver errores de validación
+## 🔒 Seguridad
 
-### Rate Limit de Shopify
+Archivos que **NUNCA** debes versionar:
+- `.env` (credenciales)
+- `credentials.json` (Service Account)
+- `/temp/` (archivos temporales)
 
-Si recibes errores 429 (Too Many Requests):
-- Aumenta el `delayMs` en [src/services/shopifyUploader.ts](src/services/shopifyUploader.ts)
-- Reduce el `batchSize`
+Ya están en `.gitignore`.
 
-## Scripts disponibles
-
-```bash
-npm run build     # Compila TypeScript a JavaScript
-npm run start     # Ejecuta la versión compilada
-npm run dev       # Ejecuta en modo desarrollo
-npm run sync      # Ejecuta sincronización (varios modos)
-```
-
-## Seguridad
-
-- **NUNCA** versiones archivos sensibles:
-  - `.env` (credenciales)
-  - `credentials.json` (cuenta de servicio Google)
-  - `token.json` (tokens de OAuth)
-  - `/output/` (archivos con datos de productos)
-
-Estos archivos ya están incluidos en [.gitignore](.gitignore).
-
-## Licencia
+## 📝 Licencia
 
 ISC
 
-## Soporte
-
-Para problemas o preguntas, abre un issue en el repositorio.
-
 ---
 
-**Nota importante**: Esta aplicación está diseñada como punto de partida. Deberás ajustar el mapeo de columnas en [src/services/dataTransformer.ts](src/services/dataTransformer.ts) según la estructura específica de tus hojas de Google Sheets.
->>>>>>> d96d7ac (first commit)
-"# SVG-to-Shopify" 
+**¿Listo para empezar?** 🚀
+
+```bash
+npm run test:optimized
+```

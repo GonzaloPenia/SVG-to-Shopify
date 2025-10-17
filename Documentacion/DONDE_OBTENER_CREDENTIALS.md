@@ -93,7 +93,7 @@ Después de seguir estos pasos, deberías tener:
 ```
 AppSVGtoShopify/
 ├── credentials.json          ← ✅ Archivo de Google Cloud
-├── .env                      ← ✅ Copiado de .env.example y editado
+├── .env                      ← ✅ Archivo de configuración con credenciales
 ├── package.json
 └── src/
 ```

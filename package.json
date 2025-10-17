@@ -7,7 +7,12 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "sync": "ts-node src/index.ts"
+    "sync": "ts-node src/index.ts",
+    "check": "ts-node src/checkShopify.ts",
+    "test:10": "ts-node src/testOptimized10.ts",
+    "test:optimized": "ts-node src/testOptimized.ts",
+    "test:one": "ts-node src/testOneFull.ts",
+    "sync:all": "ts-node src/syncAll.ts"
   },
   "keywords": ["shopify", "google-sheets", "sync", "prices"],
   "author": "",

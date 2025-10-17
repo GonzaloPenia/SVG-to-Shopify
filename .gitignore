@@ -6,7 +6,6 @@ dist/
 
 # Environment variables
 .env
-.env.example
 
 # Google Credentials
 credentials.json

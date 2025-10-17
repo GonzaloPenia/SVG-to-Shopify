@@ -106,10 +106,50 @@ export class ShopifyUploaderService {
         type: 'application/json',
       });
 
+      // Configurar inventario en 20 unidades para cada variante
+      const createdProduct = response.body.product;
+      if (createdProduct && createdProduct.variants) {
+        await this.setInventoryLevels(client, createdProduct.variants, 20);
+      }
+
       return response.body;
     } catch (error) {
       console.error(`❌ Error subiendo producto ${product.Handle}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Configura niveles de inventario para las variantes
+   */
+  private async setInventoryLevels(client: any, variants: any[], quantity: number): Promise<void> {
+    try {
+      for (const variant of variants) {
+        if (variant.inventory_item_id) {
+          // Primero obtener las locations
+          const locationsResponse = await client.get({
+            path: 'locations',
+          });
+
+          const locations = locationsResponse.body.locations || [];
+          if (locations.length > 0) {
+            const locationId = locations[0].id; // Usar la primera ubicación
+
+            // Configurar inventario
+            await client.post({
+              path: 'inventory_levels/set',
+              data: {
+                location_id: locationId,
+                inventory_item_id: variant.inventory_item_id,
+                available: quantity
+              },
+              type: 'application/json',
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`   ⚠️  No se pudo configurar inventario: ${error}`);
     }
   }
 
