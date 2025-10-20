@@ -1,0 +1,3 @@
+ID Producto,ID Variante,Handle,SKU,Tipo,Título,Marca,Modelo,Descripción,Precio,Precio Comparación,Stock,# Variantes,Estado,Categoría,Proveedor,URL Imagen,Última Sync,Modificado,Sincronizar
+123456789,987654321,michelin-ps4-205-40-17-p,MICH-PS4-205-40-17,PADRE,Michelin PILOT SPORT 4 205/40R17,Michelin,PILOT SPORT 4,Neumático de alto rendimiento para uso deportivo,197471,,20,10,ACTIVO,Neumáticos,Michelin,https://cdn.shopify.com/...,,FALSE,FALSE
+234567890,876543210,bfg-ko2-265-70-17-i,BFG-KO2-265-70-17,INDIVIDUAL,BFGoodrich All-Terrain T/A KO2 265/70R17,BFGoodrich,All-Terrain T/A KO2,Neumático todo terreno con tecnología CoreGard,185000,,15,1,ACTIVO,Neumáticos,BFGoodrich,https://cdn.shopify.com/...,,FALSE,FALSE

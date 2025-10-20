@@ -1,0 +1,27 @@
+Sección,Valor
+🚀 BYTE - Panel de Control Shopify,
+Desarrollado por BYTE para Rodavial,
+,
+📊 ESTADÍSTICAS GENERALES,
+Total de Productos:,=COUNTA(Productos!A:A)-1
+Productos Padre:,=COUNTIF(Productos!E:E,"PADRE")
+Productos Individuales:,=COUNTIF(Productos!E:E,"INDIVIDUAL")
+,
+✅ Activos:,=COUNTIF(Productos!N:N,"ACTIVO")
+❌ Inactivos:,=COUNTIF(Productos!N:N,"INACTIVO")
+,
+⚠️ Modificados (pendientes):,=COUNTIF(Productos!S:S,TRUE)
+,
+📦 INVENTARIO,
+Stock Total:,=SUM(Productos!L:L)
+Valor Total:,=SUMPRODUCT(Productos!L:L,Productos!J:J)
+,
+🏆 TOP MARCAS,
+Marca,Cantidad
+Michelin,=COUNTIF(Productos!G:G,"Michelin")
+BFGoodrich,=COUNTIF(Productos!G:G,"BFGoodrich")
+,
+,
+Última actualización: Se actualiza automáticamente con cada cambio,
+,
+Powered by BYTE 🚀,
