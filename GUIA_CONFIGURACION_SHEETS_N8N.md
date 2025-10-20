@@ -230,24 +230,64 @@ Ver archivo: `google-apps-script-panel.gs`
 
 ### Errores Detectados
 
-Los nodos de actualización hacen referencia a campos que NO existen:
+Los nodos de actualización hacen referencia a campos que NO coinciden con los nombres de columnas del Google Sheet:
 
 ```javascript
 // Nodo "⬆️ Actualizar Producto Shopify" (línea 394):
-"title": "{{ $json.titulo }}"  // ❌ Campo incorrecto
-"body_html": "{{ $json.descripcionCorta }}"  // ❌ Campo incorrecto
+"title": "{{ $json.titulo }}"  // ❌ Debe coincidir con columna del Sheet
+"body_html": "{{ $json.descripcionCorta }}"  // ❌ Debe coincidir con columna del Sheet
 
 // Nodo "⬆️ Actualizar Variante Shopify" (línea 429):
-"price": "{{ $json.precio }}"  // ❌ Campo incorrecto
-"compare_at_price": {{ $json.precioComparacion }}  // ❌ Campo incorrecto
-"inventory_quantity": {{ $json.stock }}  // ❌ Campo incorrecto
+"price": "{{ $json.precio }}"  // ❌ Debe coincidir con columna del Sheet
+"compare_at_price": {{ $json.precioComparacion }}  // ❌ Debe coincidir con columna del Sheet
+"inventory_quantity": {{ $json.stock }}  // ❌ Debe coincidir con columna del Sheet
 ```
 
 ### ✅ Solución
 
+**IMPORTANTE**: Cuando el nodo "📖 Leer Productos Modificados" lee de Google Sheets, devuelve los datos con los nombres EXACTOS de las columnas del Sheet. Por lo tanto, debes usar esos nombres exactos en los nodos de actualización.
+
+Si tus columnas en Google Sheets se llaman:
+- `titulo` (minúscula, sin tilde) → usa `$json.titulo`
+- `Título` (con mayúscula y tilde) → usa `$json.Título` o `$json['Título']`
+
+**Opción A: Nombres en minúscula sin espacios (RECOMENDADO)**
+
+Si tus columnas del Sheet son: `productId`, `titulo`, `descripcion`, `precio`, `stock`, `estado`
+
 **Nodo "⬆️ Actualizar Producto Shopify"**:
 
-Reemplazar JSON Body con:
+```json
+{
+  "product": {
+    "id": {{ $json.productId }},
+    "title": "{{ $json.titulo }}",
+    "body_html": "{{ $json.descripcion }}",
+    "status": "{{ $json.estado === 'ACTIVO' ? 'active' : 'draft' }}"
+  }
+}
+```
+
+**Nodo "⬆️ Actualizar Variante Shopify"**:
+
+```json
+{
+  "variant": {
+    "id": {{ $json.variantId }},
+    "price": "{{ $json.precio }}",
+    "compare_at_price": {{ $json.precioComparacion ? '"' + $json.precioComparacion + '"' : 'null' }},
+    "inventory_quantity": {{ $json.stock }}
+  }
+}
+```
+
+---
+
+**Opción B: Nombres con espacios y mayúsculas (si usas los headers sugeridos)**
+
+Si tus columnas del Sheet son: `ID Producto`, `Título`, `Descripción`, `Precio`, `Stock`, `Estado`
+
+**Nodo "⬆️ Actualizar Producto Shopify"**:
 
 ```json
 {
@@ -262,8 +302,6 @@ Reemplazar JSON Body con:
 
 **Nodo "⬆️ Actualizar Variante Shopify"**:
 
-Reemplazar JSON Body con:
-
 ```json
 {
   "variant": {
@@ -275,7 +313,17 @@ Reemplazar JSON Body con:
 }
 ```
 
-**⚠️ IMPORTANTE**: Los nombres de columnas con espacios deben usarse con corchetes: `$json['ID Producto']`
+**⚠️ IMPORTANTE**:
+- Los nombres de columnas con espacios DEBEN usarse con corchetes y comillas: `$json['ID Producto']`
+- Los nombres sin espacios pueden usar punto: `$json.titulo`
+- Las mayúsculas, tildes y espacios importan - deben ser EXACTOS
+
+### 🔍 Cómo Verificar los Nombres Correctos
+
+1. En n8n, ejecuta solo el nodo "📖 Leer Productos Modificados"
+2. Ve a la salida (output) del nodo
+3. Observa los nombres de los campos que devuelve
+4. Usa EXACTAMENTE esos nombres en los nodos de actualización
 
 ---
 
