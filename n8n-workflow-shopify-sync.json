@@ -1,0 +1,700 @@
+{
+  "name": "Google Sheets → Shopify Sync (Auto-Update)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XghMdKq5defsbHlISVkDry0TEoR9Wsr1KFxmjO_ZeAI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Panel_Precios",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A:N"
+        }
+      },
+      "id": "read-panel-precios",
+      "name": "Read Panel_Precios",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "google-sheets-api-key",
+          "name": "Google Sheets API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XghMdKq5defsbHlISVkDry0TEoR9Wsr1KFxmjO_ZeAI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Padres",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A:AO"
+        }
+      },
+      "id": "read-padres",
+      "name": "Read Padres",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        460,
+        480
+      ],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "google-sheets-api-key",
+          "name": "Google Sheets API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge data from Panel_Precios and Padres sheets\nconst panelPrecios = $input.all()[0].json;\nconst padres = $input.all()[1].json;\n\n// Create a map of handle -> precio data for quick lookup\nconst preciosMap = {};\npanelPrecios.forEach(row => {\n  const handle = String(row.Handle || '').toLowerCase().trim();\n  if (handle) {\n    preciosMap[handle] = {\n      precio: parseFloat(row['PRECIO CON IVA'] || row['Precio con IVA'] || 0),\n      precioSinIva: parseFloat(row['PRECIO SIN IVA'] || row['Precio sin IVA'] || 0),\n      estado: String(row.Estado || row.Status || '').toLowerCase(),\n      sku: String(row['SKU/CAI'] || row.SKU || ''),\n      medida: String(row.MEDIDA || row.Medida || ''),\n      marca: String(row.MARCA || row.Marca || ''),\n      modelo: String(row.MODELO || row.Modelo || '')\n    };\n  }\n});\n\n// Process Padres data and merge with pricing\nconst productos = [];\nconst procesados = new Set();\n\npadres.forEach(row => {\n  const handle = String(row.Handle || '').toLowerCase().trim();\n  \n  // Skip empty or already processed handles\n  if (!handle || procesados.has(handle)) return;\n  \n  // Get pricing data\n  const precioData = preciosMap[handle];\n  if (!precioData) return; // Skip if no pricing data\n  \n  // Only process active products\n  if (precioData.estado !== 'active') return;\n  \n  procesados.add(handle);\n  \n  // Determine if it's a parent or individual product\n  const isParent = handle.endsWith('-p');\n  const isIndividual = handle.endsWith('-i');\n  \n  // Build product object\n  const producto = {\n    // Identifiers\n    handle: handle,\n    sku: precioData.sku,\n    tipo: isParent ? 'padre' : (isIndividual ? 'individual' : 'desconocido'),\n    \n    // Basic Info\n    title: String(row.Title || ''),\n    vendor: String(row.Vendor || precioData.marca || ''),\n    productType: String(row['Product Type'] || row.Type || 'Neumáticos'),\n    tags: String(row.Tags || ''),\n    \n    // Description\n    bodyHtml: String(row['Body (HTML)'] || ''),\n    \n    // Pricing (from Panel_Precios)\n    price: precioData.precio.toFixed(2),\n    compareAtPrice: parseFloat(row['Variant Compare At Price'] || 0).toFixed(2),\n    \n    // Variant Options\n    option1Name: String(row['Option1 Name'] || 'Medida'),\n    option1Value: String(row['Option1 Value'] || precioData.medida || ''),\n    \n    // Inventory\n    inventoryQty: parseInt(row['Variant Inventory Qty'] || 20),\n    inventoryPolicy: String(row['Variant Inventory Policy'] || 'deny'),\n    fulfillmentService: String(row['Variant Fulfillment Service'] || 'manual'),\n    inventoryManagement: String(row['Variant Inventory Tracker'] || 'shopify'),\n    \n    // Shipping\n    weight: parseFloat(row['Variant Grams'] || 10000) / 1000, // Convert to kg\n    weightUnit: 'kg',\n    requiresShipping: String(row['Variant Requires Shipping'] || 'TRUE') === 'TRUE',\n    \n    // Tax\n    taxable: String(row['Variant Taxable'] || 'TRUE') === 'TRUE',\n    \n    // Image\n    imageSrc: String(row['Image Src'] || ''),\n    imagePosition: parseInt(row['Image Position'] || 1),\n    imageAltText: String(row['Image Alt Text'] || ''),\n    \n    // SEO\n    seoTitle: String(row['SEO Title'] || ''),\n    seoDescription: String(row['SEO Description'] || ''),\n    \n    // Status\n    status: precioData.estado === 'active' ? 'active' : 'draft',\n    published: precioData.estado === 'active',\n    \n    // Metadata from Panel_Precios\n    marca: precioData.marca,\n    modelo: precioData.modelo,\n    medida: precioData.medida,\n    precioSinIva: precioData.precioSinIva.toFixed(2),\n    \n    // Timestamp for change detection\n    lastModified: new Date().toISOString(),\n    \n    // Create hash for change detection\n    dataHash: null\n  };\n  \n  // Create a hash of critical fields to detect changes\n  const hashData = JSON.stringify({\n    price: producto.price,\n    compareAtPrice: producto.compareAtPrice,\n    inventoryQty: producto.inventoryQty,\n    status: producto.status,\n    title: producto.title,\n    bodyHtml: producto.bodyHtml\n  });\n  \n  // Simple hash function\n  let hash = 0;\n  for (let i = 0; i < hashData.length; i++) {\n    const char = hashData.charCodeAt(i);\n    hash = ((hash << 5) - hash) + char;\n    hash = hash & hash;\n  }\n  producto.dataHash = hash.toString();\n  \n  productos.push(producto);\n});\n\nconsole.log(`Procesados ${productos.length} productos`);\nconsole.log(`- Padres: ${productos.filter(p => p.tipo === 'padre').length}`);\nconsole.log(`- Individuales: ${productos.filter(p => p.tipo === 'individual').length}`);\n\nreturn productos.map(p => ({ json: p }));"
+      },
+      "id": "merge-and-transform",
+      "name": "Merge & Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "key": "shopify_products_cache",
+        "options": {}
+      },
+      "id": "get-cache",
+      "name": "Get Products Cache",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "redis": {
+          "id": "redis-local",
+          "name": "Redis Local"
+        }
+      },
+      "notes": "Almacena hash de productos para detectar cambios"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compare current products with cached versions to detect changes\nconst currentProducts = $input.first().json;\nconst cache = $input.last().json || {};\n\nconst changedProducts = [];\nconst stats = {\n  total: 0,\n  nuevos: 0,\n  modificados: 0,\n  sinCambios: 0\n};\n\n$input.all()[0].json.items.forEach(producto => {\n  stats.total++;\n  \n  const cachedProduct = cache[producto.handle];\n  \n  if (!cachedProduct) {\n    // Producto nuevo\n    stats.nuevos++;\n    changedProducts.push({\n      ...producto,\n      changeType: 'nuevo'\n    });\n  } else if (cachedProduct.dataHash !== producto.dataHash) {\n    // Producto modificado\n    stats.modificados++;\n    changedProducts.push({\n      ...producto,\n      changeType: 'modificado',\n      previousData: cachedProduct\n    });\n  } else {\n    stats.sinCambios++;\n  }\n});\n\nconsole.log('='.repeat(60));\nconsole.log('DETECCIÓN DE CAMBIOS');\nconsole.log('='.repeat(60));\nconsole.log(`Total productos: ${stats.total}`);\nconsole.log(`✨ Nuevos: ${stats.nuevos}`);\nconsole.log(`🔄 Modificados: ${stats.modificados}`);\nconsole.log(`✓ Sin cambios: ${stats.sinCambios}`);\nconsole.log('='.repeat(60));\n\nif (changedProducts.length === 0) {\n  console.log('✓ No hay cambios para sincronizar');\n  return [];\n}\n\nconsole.log(`⚡ Sincronizando ${changedProducts.length} productos...`);\n\nreturn changedProducts.map(p => ({ \n  json: p,\n  pairedItem: { item: 0 }\n}));"
+      },
+      "id": "detect-changes",
+      "name": "Detect Changes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-changes",
+              "leftValue": "={{ $json.changeType }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-changes",
+      "name": "Has Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/api/2024-01/products.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "handle",
+              "value": "={{ $json.handle }}"
+            },
+            {
+              "name": "fields",
+              "value": "id,handle,variants"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000,
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "find-shopify-product",
+      "name": "Find Shopify Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        240
+      ],
+      "credentials": {
+        "shopifyApi": {
+          "id": "shopify-api-credentials",
+          "name": "Shopify API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Shopify update payload\nconst producto = $input.first().json;\nconst shopifyProduct = $input.last().json?.products?.[0];\n\nif (!shopifyProduct) {\n  // Product doesn't exist in Shopify - skip for now\n  // (New products should be created via bulk import first)\n  console.log(`⚠️  Producto ${producto.handle} no existe en Shopify - omitiendo`);\n  return [];\n}\n\nconst productId = shopifyProduct.id;\nconst variantId = shopifyProduct.variants?.[0]?.id;\n\nif (!variantId) {\n  console.log(`⚠️  Producto ${producto.handle} no tiene variantes - omitiendo`);\n  return [];\n}\n\n// Build update payload - only update changed fields\nconst updatePayload = {\n  productId: productId,\n  variantId: variantId,\n  handle: producto.handle,\n  changeType: producto.changeType,\n  \n  // Product-level updates\n  product: {\n    id: productId,\n    title: producto.title,\n    body_html: producto.bodyHtml,\n    vendor: producto.vendor,\n    product_type: producto.productType,\n    tags: producto.tags,\n    status: producto.status\n  },\n  \n  // Variant-level updates\n  variant: {\n    id: variantId,\n    price: producto.price,\n    compare_at_price: producto.compareAtPrice > 0 ? producto.compareAtPrice : null,\n    sku: producto.sku,\n    inventory_quantity: producto.inventoryQty,\n    inventory_policy: producto.inventoryPolicy,\n    fulfillment_service: producto.fulfillmentService,\n    inventory_management: producto.inventoryManagement,\n    weight: producto.weight,\n    weight_unit: producto.weightUnit,\n    requires_shipping: producto.requiresShipping,\n    taxable: producto.taxable,\n    option1: producto.option1Value\n  }\n};\n\nconsole.log(`🔄 Actualizando ${producto.changeType}: ${producto.handle}`);\nif (producto.changeType === 'modificado') {\n  console.log(`   Precio: ${producto.previousData?.price} → ${producto.price}`);\n}\n\nreturn [{ json: updatePayload }];"
+      },
+      "id": "prepare-update",
+      "name": "Prepare Update Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/api/2024-01/products/{{ $json.productId }}.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "product",
+              "value": "={{ $json.product }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000,
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryInterval": 1000
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 600
+            }
+          }
+        }
+      },
+      "id": "update-shopify-product",
+      "name": "Update Shopify Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        240
+      ],
+      "credentials": {
+        "shopifyApi": {
+          "id": "shopify-api-credentials",
+          "name": "Shopify API"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Rate limit: 600ms between requests"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/api/2024-01/variants/{{ $json.variantId }}.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "variant",
+              "value": "={{ $json.variant }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000,
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryInterval": 1000
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 600
+            }
+          }
+        }
+      },
+      "id": "update-shopify-variant",
+      "name": "Update Shopify Variant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        420
+      ],
+      "credentials": {
+        "shopifyApi": {
+          "id": "shopify-api-credentials",
+          "name": "Shopify API"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Rate limit: 600ms between requests"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update inventory levels\nconst payload = $input.first().json;\nconst productUpdate = $input.all()[1].json;\nconst variantUpdate = $input.all()[2].json;\n\nif (!productUpdate?.product?.id || !variantUpdate?.variant?.id) {\n  console.log(`⚠️  Error actualizando ${payload.handle}`);\n  return [{ \n    json: {\n      handle: payload.handle,\n      success: false,\n      error: 'Product or variant update failed'\n    }\n  }];\n}\n\n// Get inventory item ID from variant\nconst inventoryItemId = variantUpdate.variant.inventory_item_id;\n\nif (!inventoryItemId) {\n  console.log(`⚠️  No inventory_item_id para ${payload.handle}`);\n  return [{ \n    json: {\n      handle: payload.handle,\n      success: true,\n      inventoryUpdated: false\n    }\n  }];\n}\n\nconsole.log(`✅ Actualizado: ${payload.handle}`);\n\nreturn [{ \n  json: {\n    handle: payload.handle,\n    productId: productUpdate.product.id,\n    variantId: variantUpdate.variant.id,\n    inventoryItemId: inventoryItemId,\n    inventoryQty: payload.variant.inventory_quantity,\n    success: true,\n    changeType: payload.changeType\n  }\n}];"
+      },
+      "id": "process-update-result",
+      "name": "Process Update Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ 'shopify_products_cache:' + $json.handle }}",
+        "value": "={{ JSON.stringify({ dataHash: $json.dataHash, lastSync: new Date().toISOString() }) }}",
+        "options": {
+          "ttl": 86400
+        }
+      },
+      "id": "update-cache",
+      "name": "Update Cache",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2440,
+        240
+      ],
+      "credentials": {
+        "redis": {
+          "id": "redis-local",
+          "name": "Redis Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate summary report\nconst results = $input.all();\n\nconst stats = {\n  total: results.length,\n  exitosos: results.filter(r => r.json.success).length,\n  fallidos: results.filter(r => !r.json.success).length,\n  nuevos: results.filter(r => r.json.changeType === 'nuevo' && r.json.success).length,\n  modificados: results.filter(r => r.json.changeType === 'modificado' && r.json.success).length\n};\n\nconst report = {\n  timestamp: new Date().toISOString(),\n  execution: 'sync',\n  stats: stats,\n  duration: '{{ $execution.duration }}',\n  success: stats.fallidos === 0,\n  message: `✅ Sincronización completada: ${stats.exitosos}/${stats.total} productos actualizados`,\n  details: {\n    nuevos: stats.nuevos,\n    modificados: stats.modificados,\n    fallidos: stats.fallidos\n  },\n  errors: results\n    .filter(r => !r.json.success)\n    .map(r => ({\n      handle: r.json.handle,\n      error: r.json.error\n    }))\n};\n\nconsole.log('\\n' + '='.repeat(60));\nconsole.log('📊 RESUMEN DE SINCRONIZACIÓN');\nconsole.log('='.repeat(60));\nconsole.log(`Total procesados: ${stats.total}`);\nconsole.log(`✅ Exitosos: ${stats.exitosos}`);\nif (stats.nuevos > 0) console.log(`   - Nuevos: ${stats.nuevos}`);\nif (stats.modificados > 0) console.log(`   - Modificados: ${stats.modificados}`);\nif (stats.fallidos > 0) console.log(`❌ Fallidos: ${stats.fallidos}`);\nconsole.log('='.repeat(60));\n\nif (report.errors.length > 0) {\n  console.log('\\n⚠️  ERRORES:');\n  report.errors.forEach(e => {\n    console.log(`   - ${e.handle}: ${e.error}`);\n  });\n}\n\nreturn [{ json: report }];"
+      },
+      "id": "generate-report",
+      "name": "Generate Summary Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔄 Flujo de Sincronización Automática\n\n**Objetivo:** Detectar cambios en Google Sheets y actualizar productos en Shopify automáticamente.\n\n**Frecuencia:** Cada 30 minutos\n\n**Proceso:**\n1. Lee datos de ambas hojas (Panel_Precios y Padres)\n2. Merge y transforma los datos\n3. Detecta cambios comparando con caché (Redis)\n4. Actualiza solo productos modificados\n5. Respeta rate limits (600ms entre requests)\n6. Genera reporte de sincronización\n\n**Optimizaciones:**\n- ✅ Solo sincroniza productos con cambios\n- ✅ Usa hash para detección rápida de cambios\n- ✅ Rate limiting automático (600ms)\n- ✅ Retry en caso de errores\n- ✅ Logs detallados\n- ✅ Caché con TTL de 24 horas",
+        "height": 464,
+        "width": 389,
+        "color": 4
+      },
+      "id": "sticky-note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        140,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔍 Detección de Cambios\n\nCompara el hash de datos críticos:\n- Precio\n- Inventario\n- Estado\n- Título\n- Descripción\n\nSolo actualiza si hay diferencias.",
+        "height": 249,
+        "width": 265,
+        "color": 5
+      },
+      "id": "sticky-note-2",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ⚡ Rate Limiting\n\nShopify límite: 2 req/seg\nNuestro delay: 600ms/req\nVelocidad: ~1.66 req/seg\n\n✅ Seguro y estable",
+        "height": 220,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky-note-3",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "no-changes",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-empty",
+      "name": "No Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Skip execution - no changes detected\nconsole.log('✓ No hay cambios para sincronizar - finalizando ejecución');\n\nreturn [{ \n  json: {\n    timestamp: new Date().toISOString(),\n    execution: 'sync',\n    stats: {\n      total: 0,\n      exitosos: 0,\n      fallidos: 0\n    },\n    success: true,\n    message: '✓ No hay cambios para sincronizar',\n    skipped: true\n  }\n}];"
+      },
+      "id": "skip-execution",
+      "name": "Skip Execution",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        580
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Read Panel_Precios",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Padres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Panel_Precios": {
+      "main": [
+        [
+          {
+            "node": "Merge & Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Padres": {
+      "main": [
+        [
+          {
+            "node": "Merge & Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Get Products Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Products Cache": {
+      "main": [
+        [
+          {
+            "node": "Detect Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Changes": {
+      "main": [
+        [
+          {
+            "node": "Has Changes?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "No Changes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Changes?": {
+      "main": [
+        [
+          {
+            "node": "Find Shopify Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Shopify Product": {
+      "main": [
+        [
+          {
+            "node": "Prepare Update Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Update Payload": {
+      "main": [
+        [
+          {
+            "node": "Update Shopify Product",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Shopify Variant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Shopify Product": {
+      "main": [
+        [
+          {
+            "node": "Process Update Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Shopify Variant": {
+      "main": [
+        [
+          {
+            "node": "Process Update Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Update Result": {
+      "main": [
+        [
+          {
+            "node": "Update Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Cache": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Changes?": {
+      "main": [
+        [
+          {
+            "node": "Skip Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": "local"
+  },
+  "tags": [
+    {
+      "createdAt": "2025-01-17T00:00:00.000Z",
+      "updatedAt": "2025-01-17T00:00:00.000Z",
+      "id": "1",
+      "name": "Shopify"
+    },
+    {
+      "createdAt": "2025-01-17T00:00:00.000Z",
+      "updatedAt": "2025-01-17T00:00:00.000Z",
+      "id": "2",
+      "name": "Google Sheets"
+    },
+    {
+      "createdAt": "2025-01-17T00:00:00.000Z",
+      "updatedAt": "2025-01-17T00:00:00.000Z",
+      "id": "3",
+      "name": "Auto-Sync"
+    }
+  ]
+}

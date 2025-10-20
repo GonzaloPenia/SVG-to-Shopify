@@ -1,0 +1,561 @@
+{
+  "name": "🎛️ BYTE - Panel de Control Shopify (Bidireccional)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "⏰ Cada 15 Minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Sincronización automática cada 15 minutos"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/api/2024-01/products.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "250"
+            },
+            {
+              "name": "fields",
+              "value": "id,title,handle,vendor,product_type,status,variants,image,body_html,tags"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.headers.link }}",
+              "limitPagesFetched": true,
+              "maxRequests": 50
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-all-products",
+      "name": "📦 Obtener Todos los Productos Shopify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "shopifyApi": {
+          "id": "shopify-api",
+          "name": "Shopify API"
+        }
+      },
+      "notes": "Obtiene todos los productos con paginación"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform Shopify products to Google Sheets format\nconst products = [];\n\n// Process all items from pagination\nfor (const item of $input.all()) {\n  const shopifyProducts = item.json.products || [];\n  \n  shopifyProducts.forEach(product => {\n    const variant = product.variants?.[0] || {};\n    \n    // Determine product type based on handle suffix\n    const handle = product.handle || '';\n    const isPadre = handle.endsWith('-p');\n    const isIndividual = handle.endsWith('-i');\n    const tipo = isPadre ? 'PADRE' : (isIndividual ? 'INDIVIDUAL' : 'OTRO');\n    \n    // Extract marca and modelo from title\n    const titleParts = product.title.split(' ');\n    const marca = titleParts[0] || '';\n    const modelo = titleParts.slice(1).join(' ').split(/\\d/)[0].trim();\n    \n    // Count total variants\n    const totalVariants = product.variants?.length || 0;\n    \n    products.push({\n      // Identificadores\n      productId: product.id,\n      variantId: variant.id,\n      handle: handle,\n      sku: variant.sku || '',\n      tipo: tipo,\n      \n      // Información básica\n      titulo: product.title,\n      marca: marca,\n      modelo: modelo,\n      \n      // Descripción\n      descripcion: product.body_html || '',\n      descripcionCorta: product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) : '',\n      \n      // Pricing\n      precio: parseFloat(variant.price || 0),\n      precioComparacion: parseFloat(variant.compare_at_price || 0),\n      precioFormateado: `$${parseFloat(variant.price || 0).toLocaleString('es-AR')}`,\n      \n      // Inventory\n      stock: variant.inventory_quantity || 0,\n      stockDisponible: variant.inventory_quantity > 0 ? 'SÍ' : 'NO',\n      politicaInventario: variant.inventory_policy || 'deny',\n      \n      // Variantes (para productos padre)\n      totalVariantes: totalVariants,\n      variantes: totalVariants > 1 ? `${totalVariants} medidas` : '1 medida',\n      \n      // Status\n      estado: product.status === 'active' ? 'ACTIVO' : 'INACTIVO',\n      publicado: product.status === 'active' ? 'SÍ' : 'NO',\n      \n      // Categorización\n      categoria: product.product_type || 'Neumáticos',\n      proveedor: product.vendor || marca,\n      etiquetas: product.tags || '',\n      \n      // Image\n      imagenUrl: product.image?.src || '',\n      tieneImagen: product.image?.src ? 'SÍ' : 'NO',\n      \n      // Metadata\n      ultimaActualizacion: new Date().toISOString(),\n      fechaModificacion: new Date().toLocaleDateString('es-AR'),\n      horaModificacion: new Date().toLocaleTimeString('es-AR'),\n      \n      // Shopify URLs\n      urlAdmin: `https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/products/${product.id}`,\n      urlTienda: product.status === 'active' ? `https://{{ $env.SHOPIFY_SHOP_DOMAIN.replace('.myshopify.com', '') }}/products/${handle}` : '',\n      \n      // Flags para edición\n      modificado: 'NO',\n      sincronizar: 'NO'\n    });\n  });\n}\n\n// Sort by tipo (PADRE first) then by marca and modelo\nproducts.sort((a, b) => {\n  if (a.tipo !== b.tipo) {\n    if (a.tipo === 'PADRE') return -1;\n    if (b.tipo === 'PADRE') return 1;\n  }\n  if (a.marca !== b.marca) return a.marca.localeCompare(b.marca);\n  return a.modelo.localeCompare(b.modelo);\n});\n\nconsole.log('━'.repeat(60));\nconsole.log('📊 PRODUCTOS PROCESADOS');\nconsole.log('━'.repeat(60));\nconsole.log(`Total: ${products.length}`);\nconsole.log(`📦 Padres: ${products.filter(p => p.tipo === 'PADRE').length}`);\nconsole.log(`📦 Individuales: ${products.filter(p => p.tipo === 'INDIVIDUAL').length}`);\nconsole.log(`📦 Otros: ${products.filter(p => p.tipo === 'OTRO').length}`);\nconsole.log('━'.repeat(60));\n\nreturn products.map(p => ({ json: p }));"
+      },
+      "id": "transform-to-sheets",
+      "name": "🔄 Transformar a Formato Sheets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "notes": "Convierte formato Shopify a formato amigable para Google Sheets"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.CONTROL_PANEL_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Productos",
+          "mode": "name"
+        },
+        "clear": {
+          "clear": "specificRange"
+        },
+        "range": "A2:AZ10000"
+      },
+      "id": "clear-sheet",
+      "name": "🗑️ Limpiar Hoja",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [900, 300],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "google-sheets-service-account",
+          "name": "Google Sheets Service Account"
+        }
+      },
+      "notes": "Limpia datos anteriores manteniendo encabezados"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.CONTROL_PANEL_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Productos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "productId": "={{ $json.productId }}",
+            "variantId": "={{ $json.variantId }}",
+            "handle": "={{ $json.handle }}",
+            "sku": "={{ $json.sku }}",
+            "tipo": "={{ $json.tipo }}",
+            "titulo": "={{ $json.titulo }}",
+            "marca": "={{ $json.marca }}",
+            "modelo": "={{ $json.modelo }}",
+            "descripcionCorta": "={{ $json.descripcionCorta }}",
+            "precio": "={{ $json.precio }}",
+            "precioComparacion": "={{ $json.precioComparacion }}",
+            "stock": "={{ $json.stock }}",
+            "totalVariantes": "={{ $json.totalVariantes }}",
+            "estado": "={{ $json.estado }}",
+            "categoria": "={{ $json.categoria }}",
+            "proveedor": "={{ $json.proveedor }}",
+            "imagenUrl": "={{ $json.imagenUrl }}",
+            "fechaModificacion": "={{ $json.fechaModificacion }}",
+            "modificado": "={{ $json.modificado }}",
+            "sincronizar": "={{ $json.sincronizar }}"
+          },
+          "matchingColumns": ["handle"],
+          "schema": [
+            { "id": "productId", "displayName": "ID Producto", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "variantId", "displayName": "ID Variante", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "handle", "displayName": "Handle", "required": false, "defaultMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "sku", "displayName": "SKU", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "tipo", "displayName": "Tipo", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "titulo", "displayName": "Título", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "marca", "displayName": "Marca", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "modelo", "displayName": "Modelo", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "descripcionCorta", "displayName": "Descripción", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "precio", "displayName": "Precio", "required": false, "defaultMatch": false, "display": true, "type": "number", "readOnly": false, "removed": false },
+            { "id": "precioComparacion", "displayName": "Precio Comp.", "required": false, "defaultMatch": false, "display": true, "type": "number", "readOnly": false, "removed": false },
+            { "id": "stock", "displayName": "Stock", "required": false, "defaultMatch": false, "display": true, "type": "number", "readOnly": false, "removed": false },
+            { "id": "totalVariantes", "displayName": "# Variantes", "required": false, "defaultMatch": false, "display": true, "type": "number", "readOnly": false, "removed": false },
+            { "id": "estado", "displayName": "Estado", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "categoria", "displayName": "Categoría", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "proveedor", "displayName": "Proveedor", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "imagenUrl", "displayName": "URL Imagen", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "fechaModificacion", "displayName": "Última Sync", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "modificado", "displayName": "Modificado", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "sincronizar", "displayName": "Sincronizar", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false }
+          ]
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED",
+          "useAppend": false
+        }
+      },
+      "id": "write-to-sheets",
+      "name": "📝 Escribir en Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1120, 300],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "google-sheets-service-account",
+          "name": "Google Sheets Service Account"
+        }
+      },
+      "notes": "Escribe todos los productos en la hoja"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.CONTROL_PANEL_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Productos",
+          "mode": "name"
+        },
+        "options": {
+          "range": ""
+        }
+      },
+      "id": "read-modified-products",
+      "name": "📖 Leer Productos Modificados",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [460, 600],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "google-sheets-service-account",
+          "name": "Google Sheets Service Account"
+        }
+      },
+      "notes": "Lee productos marcados como modificados"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-modified",
+              "leftValue": "={{ $json.sincronizar }}",
+              "rightValue": "SÍ",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-modified",
+      "name": "🔍 Filtrar Modificados",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 600],
+      "notes": "Solo procesa productos con Sincronizar=SÍ"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/api/2024-01/products/{{ $json.productId }}.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"product\": {\n    \"id\": {{ $json.productId }},\n    \"title\": \"{{ $json.titulo }}\",\n    \"body_html\": \"{{ $json.descripcionCorta }}\",\n    \"status\": \"{{ $json.estado === 'ACTIVO' ? 'active' : 'draft' }}\"\n  }\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 600
+            }
+          },
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "update-shopify-product",
+      "name": "⬆️ Actualizar Producto Shopify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 520],
+      "credentials": {
+        "shopifyApi": {
+          "id": "shopify-api",
+          "name": "Shopify API"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Actualiza título, descripción y estado"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $env.SHOPIFY_SHOP_DOMAIN }}/admin/api/2024-01/variants/{{ $json.variantId }}.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"variant\": {\n    \"id\": {{ $json.variantId }},\n    \"price\": \"{{ $json.precio }}\",\n    \"compare_at_price\": {{ $json.precioComparacion > 0 ? $json.precioComparacion : 'null' }},\n    \"inventory_quantity\": {{ $json.stock }}\n  }\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 600
+            }
+          },
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "update-shopify-variant",
+      "name": "⬆️ Actualizar Variante Shopify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 680],
+      "credentials": {
+        "shopifyApi": {
+          "id": "shopify-api",
+          "name": "Shopify API"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Actualiza precio y stock"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mark product as synchronized in Google Sheets\nconst handle = $json.handle;\nconst productUpdate = $input.all()[1]?.json?.product;\nconst variantUpdate = $input.all()[2]?.json?.variant;\n\nconst success = productUpdate && variantUpdate;\n\nconsole.log(`${success ? '✅' : '❌'} ${handle}: ${success ? 'Actualizado' : 'Error'}`);\n\nreturn [{ \n  json: {\n    handle: handle,\n    success: success,\n    sincronizar: 'NO',\n    modificado: 'NO',\n    ultimaSync: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "process-sync-result",
+      "name": "✅ Procesar Resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 600],
+      "notes": "Marca producto como sincronizado"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.CONTROL_PANEL_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Productos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "handle": "={{ $json.handle }}",
+            "sincronizar": "NO",
+            "modificado": "NO",
+            "fechaModificacion": "={{ new Date().toLocaleDateString('es-AR') }}"
+          },
+          "matchingColumns": ["handle"],
+          "schema": [
+            { "id": "handle", "displayName": "Handle", "required": true, "defaultMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "sincronizar", "displayName": "Sincronizar", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "modificado", "displayName": "Modificado", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "fechaModificacion", "displayName": "Última Sync", "required": false, "defaultMatch": false, "display": true, "type": "string", "readOnly": false, "removed": false }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reset-flags",
+      "name": "🔄 Resetear Flags",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1340, 600],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "google-sheets-service-account",
+          "name": "Google Sheets Service Account"
+        }
+      },
+      "notes": "Resetea flags de sincronización"
+    },
+    {
+      "parameters": {
+        "content": "## 🎛️ BYTE - Panel de Control Shopify\n\n**Powered by BYTE**\n\n### Flujo Principal:\n1. **Shopify → Sheets** (cada 15 min)\n   - Obtiene todos los productos\n   - Actualiza Google Sheets\n   - Mantiene sincronizado\n\n2. **Sheets → Shopify** (cada 15 min)\n   - Lee productos modificados\n   - Actualiza en Shopify\n   - Resetea flags\n\n### Features:\n- ✅ Sincronización bidireccional\n- ✅ Rate limiting (600ms)\n- ✅ Retry automático\n- ✅ Logs detallados\n- ✅ Manejo de errores\n\n### Campos Editables:\n- Título\n- Descripción\n- Precio\n- Precio Comparación  \n- Stock\n- Estado (ACTIVO/INACTIVO)",
+        "height": 540,
+        "width": 380,
+        "color": 7
+      },
+      "id": "sticky-note-byte",
+      "name": "📋 BYTE Info",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [140, 140]
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ Rate Limiting\n\n**Shopify Límites:**\n- 2 req/seg (Basic/Advanced)\n- 4 req/seg (Shopify Plus)\n\n**Configuración Actual:**\n- 600ms delay entre requests\n- ~1.66 req/seg\n- ✅ Seguro para todos los planes\n\n**BYTE garantiza estabilidad**",
+        "height": 280,
+        "width": 320,
+        "color": 6
+      },
+      "id": "sticky-note-limits",
+      "name": "⚡ Limits Info",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [820, 80]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "⏰ Cada 15 Minutos": {
+      "main": [
+        [
+          {
+            "node": "📦 Obtener Todos los Productos Shopify",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "📖 Leer Productos Modificados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Obtener Todos los Productos Shopify": {
+      "main": [
+        [
+          {
+            "node": "🔄 Transformar a Formato Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 Transformar a Formato Sheets": {
+      "main": [
+        [
+          {
+            "node": "🗑️ Limpiar Hoja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗑️ Limpiar Hoja": {
+      "main": [
+        [
+          {
+            "node": "📝 Escribir en Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Leer Productos Modificados": {
+      "main": [
+        [
+          {
+            "node": "🔍 Filtrar Modificados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Filtrar Modificados": {
+      "main": [
+        [
+          {
+            "node": "⬆️ Actualizar Producto Shopify",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "⬆️ Actualizar Variante Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⬆️ Actualizar Producto Shopify": {
+      "main": [
+        [
+          {
+            "node": "✅ Procesar Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⬆️ Actualizar Variante Shopify": {
+      "main": [
+        [
+          {
+            "node": "✅ Procesar Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "✅ Procesar Resultado": {
+      "main": [
+        [
+          {
+            "node": "🔄 Resetear Flags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": "byte-control-panel"
+  },
+  "tags": [
+    {
+      "id": "byte",
+      "name": "BYTE",
+      "createdAt": "2025-01-17T00:00:00.000Z",
+      "updatedAt": "2025-01-17T00:00:00.000Z"
+    },
+    {
+      "id": "shopify",
+      "name": "Shopify",
+      "createdAt": "2025-01-17T00:00:00.000Z",
+      "updatedAt": "2025-01-17T00:00:00.000Z"
+    },
+    {
+      "id": "rodavial",
+      "name": "Rodavial",
+      "createdAt": "2025-01-17T00:00:00.000Z",
+      "updatedAt": "2025-01-17T00:00:00.000Z"
+    }
+  ]
+}
